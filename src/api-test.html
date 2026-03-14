@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PHPログインテスト</title>
+</head>
+<body>
+
+    <h1>PHP Log-In Tester</h1>
+
+    <div>
+        <input id="email" type="email" value="test@example.com" placeholder="email">
+        <input id="password" type="password" value="123456" placeholder="password">
+    </div>
+
+    <div>
+        <button id="signupBtn">新規登録</button>
+        <button id="loginBtn">ログイン</button>
+        <button id="meBtn">ログイン状態確認</button>
+        <button id="logoutBtn">ログアウト</button>
+    </div>
+
+    <pre id="result" style="margin-top: 24px; white-space: pre-wrap;"></pre>
+
+    <script>
+        const emailInput = document.getElementById("email");
+        const passwordInput = document.getElementById("password");
+        const result = document.getElementById("result");
+
+        async function callApi(url, options = {}) {
+            const response = await fetch(url,{
+                credentials: "include",
+                ...options
+            });
+
+            const rawText = await response.text()
+
+            try {
+                const data = await response.json();
+                result.textContent = JSON.stringify(data, null, 2);
+                
+            } catch (error) {
+                result.textContent = 
+                "JSONではありません。\n\n" +
+                "status:" + response.status + "\n\n" +
+                rawText;
+            }
+
+            
+        }
+
+        document.getElementById("signupBtn").addEventListener("click",async() =>{
+            await callApi("/api/signup.php", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    email: emailInput.value,
+                    password: passwordInput.value,
+                }),
+            });
+        });
+
+        document.getElementById("loginBtn").addEventListener("click",async() =>{
+            await callApi("/api/login.php", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    email: emailInput.value,
+                    password: passwordInput.value,
+                }),
+            });
+        });
+
+        document.getElementById("meBtn").addEventListener("click", async() => {
+            await callApi("/api/me.php");
+        });
+
+        document.getElementById("logoutBtn").addEventListener("click", async() => {
+            await callApi("/api/logout.php",{
+                method:"POST",
+            });
+        });
+
+
+
+    </script>
+</body>
+</html>

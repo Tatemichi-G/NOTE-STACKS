@@ -1,0 +1,16 @@
+#macOS
+.DS_Store
+._*
+
+#Node
+node_modules/
+frontend/node_modules/
+
+#Build outputs
+dist/
+frontend/dist/
+
+#Env files
+.env
+.env.*
+!.env.example

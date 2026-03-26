@@ -10,6 +10,34 @@ import {
   deleteNote,
 } from "./lib/phpApi";
 
+function formatDate(dateString) {
+  const date = new Date(dateString);
+
+  if (Number.isNaN(date.getTime())) {
+    return dateString;
+  }
+
+  return date.toLocaleString("ja-JP", {
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function getPreviewText(content) {
+  const firstLine = content
+    .split("\n")
+    .map((line) => line.trim())
+    .find((line) => line);
+
+  if (!firstLine) {
+    return "本文はまだありません";
+  }
+
+  return firstLine;
+}
+
 function AuthForm({ onLoginSuccess }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -39,9 +67,9 @@ function AuthForm({ onLoginSuccess }) {
   };
 
   return (
-    <div className='page'>
-      <div className='card'>
-        <h1>PHP Notes</h1>
+    <main className='page'>
+      <section className='card'>
+        <h1>NOTE STACKS</h1>
 
         <div className='mode-row'>
           <button
@@ -90,13 +118,15 @@ function AuthForm({ onLoginSuccess }) {
         </form>
 
         {message && <p className='message'>{message}</p>}
-      </div>
-    </div>
+      </section>
+    </main>
   );
 }
 
 function NotesHome({ session, onLogoutSuccess }) {
   const [notes, setNotes] = useState([]);
+  const [selectedNoteId, setSelectedNoteId] = useState(null);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [loading, setLoading] = useState(false);
@@ -108,7 +138,19 @@ function NotesHome({ session, onLogoutSuccess }) {
 
     try {
       const result = await getNotes();
-      setNotes(result.notes ?? []);
+      const nextNotes = result.notes ?? [];
+      setNotes(nextNotes);
+      setSelectedNoteId((prev) => {
+        if (nextNotes.length === 0) {
+          return null;
+        }
+
+        if (prev && nextNotes.some((note) => note.id === prev)) {
+          return prev;
+        }
+
+        return nextNotes[0].id;
+      });
     } catch (error) {
       setMessage(error.message ?? String(error));
     } finally {
@@ -132,6 +174,7 @@ function NotesHome({ session, onLogoutSuccess }) {
     try {
       const result = await createNote(title.trim(), content);
       setNotes((prev) => [result.note, ...prev]);
+      setSelectedNoteId(result.note.id);
       setTitle("");
       setContent("");
     } catch (error) {
@@ -149,7 +192,23 @@ function NotesHome({ session, onLogoutSuccess }) {
 
     try {
       await deleteNote(id);
-      setNotes((prev) => prev.filter((note) => note.id !== id));
+      setNotes((prev) => {
+        const nextNotes = prev.filter((note) => note.id !== id);
+
+        setSelectedNoteId((currentId) => {
+          if (currentId !== id) {
+            return currentId;
+          }
+
+          if (nextNotes.length === 0) {
+            return null;
+          }
+
+          return nextNotes[0].id;
+        });
+
+        return nextNotes;
+      });
     } catch (error) {
       setMessage(error.message ?? String(error));
     } finally {
@@ -171,77 +230,166 @@ function NotesHome({ session, onLogoutSuccess }) {
     }
   };
 
+  const selectedNote =
+    notes.find((note) => note.id === selectedNoteId) ?? notes[0] ?? null;
+
   return (
-    <div className='page'>
-      <div className='card wide'>
-        <div className='topbar'>
-          <div>
-            <h1>Notes</h1>
+    <main className='notes-page'>
+      <div className='notes-shell'>
+        <article className='notes-column notes-column-left'>
+          <section className='panel user-panel'>
+            <h1>NOTE STACKS</h1>
             <p className='subtext'>ログイン中: {session.email}</p>
-          </div>
 
-          <button onClick={handleLogout} disabled={loading}>
-            ログアウト
-          </button>
-        </div>
+            <button onClick={handleLogout} disabled={loading}>
+              ログアウト
+            </button>
+          </section>
 
-        <div className='create-box'>
-          <h2>新規作成</h2>
-
-          <input
-            placeholder='タイトル'
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-          />
-
-          <textarea
-            placeholder='本文'
-            rows={5}
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-          />
-
-          <div className='button-row'>
-            <button onClick={handleCreate} disabled={loading}>
-              {loading ? "..." : "追加"}
+          <section className='panel create-panel'>
+            <button
+              type='button'
+              className='create-toggle'
+              onClick={() => setIsCreateOpen((prev) => !prev)}
+            >
+              <h2>新規作成</h2>
+              <span className='create-toggle-mark'>
+                {isCreateOpen ? "閉じる" : "開く"}
+              </span>
             </button>
 
-            <button onClick={loadNotes} disabled={loading}>
-              {loading ? "..." : "再読み込み"}
-            </button>
-          </div>
-        </div>
+            <div
+              className={
+                isCreateOpen ? "create-form-area open" : "create-form-area"
+              }
+            >
+              <p className='panel-copy'>
+                日常のアイデアやメモをさっと記録。シンプルなノートアプリで、思考を整理しましょう。
+              </p>
 
-        {message && <p className='message'>{message}</p>}
+              <input
+                placeholder='タイトル'
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+              />
 
-        <div className='notes-list'>
-          <h2>一覧</h2>
+              <textarea
+                placeholder='本文'
+                rows={8}
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+              />
 
-          {notes.length === 0 ? (
-            <p>ノートがありません</p>
-          ) : (
-            notes.map((note) => (
-              <div key={note.id} className='note-card'>
-                <h3>{note.title}</h3>
-                <p>{note.content}</p>
-                <small>
-                  id: {note.id} / updated: {note.updated_at}
-                </small>
+              <div className='button-row'>
+                <button onClick={handleCreate} disabled={loading}>
+                  {loading ? "..." : "追加"}
+                </button>
 
-                <div className='button-row'>
-                  <button
-                    onClick={() => handleDelete(note.id)}
-                    disabled={loading}
-                  >
-                    削除
-                  </button>
-                </div>
+                <button onClick={loadNotes} disabled={loading}>
+                  {loading ? "..." : "再読み込み"}
+                </button>
               </div>
-            ))
-          )}
-        </div>
+            </div>
+          </section>
+        </article>
+
+        <section className='notes-column notes-column-center'>
+          <div className='panel list-panel'>
+            <div className='list-header'>
+              <div>
+                <h2>一覧</h2>
+                <p className='panel-copy'>{notes.length}件のノート</p>
+              </div>
+            </div>
+
+            <div className='list-scroll'>
+              {message && <p className='message'>{message}</p>}
+
+              {notes.length === 0 ? (
+                <p className='empty-text'>ノートがありません</p>
+              ) : (
+                <div className='notes-list'>
+                  {notes.map((note) => {
+                    const isActive = selectedNote?.id === note.id;
+
+                    return (
+                      <button
+                        key={note.id}
+                        type='button'
+                        className={isActive ? "note-card active" : "note-card"}
+                        onClick={() => setSelectedNoteId(note.id)}
+                    >
+                      <span className='note-date'>
+                        {formatDate(note.updated_at)}
+                      </span>
+                      <strong className='note-title'>{note.title}</strong>
+                      <span className='note-preview'>
+                        {getPreviewText(note.content)}
+                      </span>
+                      <p className='note-content-mobile'>{note.content}</p>
+                      <span className='note-action-mobile'>
+                        <span
+                          className='note-delete-button'
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            handleDelete(note.id);
+                          }}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter" || event.key === " ") {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              handleDelete(note.id);
+                            }
+                          }}
+                          role='button'
+                          tabIndex={0}
+                        >
+                          削除
+                        </span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              )}
+            </div>
+          </div>
+        </section>
+
+        <section className='notes-column notes-column-right'>
+          <div className='panel detail-panel'>
+            <div className='detail-header'>
+              <div>
+                <p className='eyebrow'>Preview</p>
+                <h2>{selectedNote ? selectedNote.title : "ノート詳細"}</h2>
+              </div>
+
+              {selectedNote ? (
+                <button
+                  onClick={() => handleDelete(selectedNote.id)}
+                  disabled={loading}
+                >
+                  削除
+                </button>
+              ) : null}
+            </div>
+
+            {selectedNote ? (
+              <div className='detail-body'>
+                <p className='detail-date'>
+                  最終更新: {formatDate(selectedNote.updated_at)}
+                </p>
+                <p className='detail-content'>{selectedNote.content}</p>
+              </div>
+            ) : (
+              <p className='empty-text'>
+                ノートを選ぶと、ここに内容が表示されます。
+              </p>
+            )}
+          </div>
+        </section>
       </div>
-    </div>
+    </main>
   );
 }
 

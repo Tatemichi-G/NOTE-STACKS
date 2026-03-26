@@ -1,4 +1,4 @@
-# このアプリの概要 「PHP-REACT-NOTE」
+# このアプリの概要 「NOTE-STACKS」
 
 PHP + React + MariaDB + Docker で作成したメモアプリで、ユーザー登録、ログイン、ノート作成、一覧表示、更新、削除ができます。
 フロントエンド　＋　バックエンド　＋　DB の設計・実装を学ぶために作成しました。
@@ -30,14 +30,21 @@ MARIADB_ROOT_PASSWORD=rootpass
 MARIADB_DATABASE=notes_app
 MARIADB_USER=appuser
 MARIADB_PASSWORD=apppass
+```
 
 2. Docker を起動する
-docker compose up --build
 
-3.フロントエンドを起動する
+```bash
+docker compose up --build
+```
+
+3. フロントエンドを起動する
+
+```bash
 cd frontend
 npm install
 npm run dev
+```
 
 ## アクセス先
 PHP API: http://localhost:8000
